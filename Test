@@ -1,3 +1,32 @@
+local keyCode = "222554" -- 🔐 รหัสของคุณ
+local keyFileName = "warp_key_cache.txt"
+
+-- 🕒 ดึงเวลาวันนี้ (เช่น 2025-06-28)
+local function getTodayString()
+    local date = os.date("*t")
+    return string.format("%04d-%02d-%02d", date.year, date.month, date.day)
+end
+
+-- ✅ ตรวจสอบว่าเคยใส่รหัสแล้วหรือยัง
+local function hasValidKey()
+    if not isfile or not readfile then return false end
+    if not isfile(keyFileName) then return false end
+
+    local content = readfile(keyFileName)
+    local parts = string.split(content, "|")
+    local savedKey = parts[1]
+    local savedDate = parts[2]
+
+    return savedKey == keyCode and savedDate == getTodayString()
+end
+
+-- 💾 บันทึก Key ลงไฟล์
+local function saveKey()
+    if writefile then
+        writefile(keyFileName, keyCode .. "|" .. getTodayString())
+    end
+end
+
 if game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui"):FindFirstChild("WarpControlGui") then
     game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("WarpControlGui"):Destroy()
     warn("Create")
@@ -19,7 +48,7 @@ local function getRandomBehindPosition(targetHRP)
     local backVector = -targetHRP.CFrame.LookVector.Unit
     local angle = math.rad(math.random(-90, 90))
     local rotatedVector = CFrame.fromAxisAngle(Vector3.new(0, 1, 0), angle):VectorToWorldSpace(backVector)
-    local radius = math.random(2, 5)
+    local radius = math.random(3, 7)
     local offset = rotatedVector * radius
     return Vector3.new(targetHRP.Position.X + offset.X, targetHRP.Position.Y, targetHRP.Position.Z + offset.Z)
 end
@@ -108,7 +137,7 @@ frame.Draggable = true
 local textBox = Instance.new("TextBox", frame)
 textBox.Size = UDim2.new(1, -10, 0, 40)
 textBox.Position = UDim2.new(0, 5, 0, 5)
-textBox.PlaceholderText = "Credit By Lunarplyr"
+textBox.PlaceholderText = "Credit By ลุงอาร์ม"
 textBox.Text = ""
 textBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -190,3 +219,87 @@ miniToggle.MouseButton1Click:Connect(function()
     end
 end)
 
+if game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui"):FindFirstChild("KeySystem") then
+    game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("KeySystem"):Destroy()
+    warn("Create")
+    wait("1.5")
+    warn("เสร็จแล้วค้าบ😘")
+    print("Script by Lunarplyr")
+end
+
+local keyGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+keyGui.Name = "KeySystem"
+keyGui.ResetOnSpawn = false
+
+local keyFrame = Instance.new("Frame", keyGui)
+keyFrame.Size = UDim2.new(0, 260, 0, 133)
+keyFrame.Position = UDim2.new(0.5, -125, 0.5, -60)
+keyFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+keyFrame.BorderSizePixel = 0
+
+local keyCorner = Instance.new("UICorner", keyFrame)
+keyCorner.CornerRadius = UDim.new(0, 10)
+
+local keyBox = Instance.new("TextBox", keyFrame)
+keyBox.Size = UDim2.new(1, -20, 0, 40)
+keyBox.Position = UDim2.new(0, 10, 0, 10)
+keyBox.PlaceholderText = "Key"
+keyBox.Text = ""
+keyBox.ClearTextOnFocus = true
+keyBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+keyBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+keyBox.BorderSizePixel = 0
+keyFrame.Active = true
+keyFrame.Draggable = true
+
+
+local submitButton = Instance.new("TextButton", keyFrame)
+submitButton.Size = UDim2.new(1, -20, 0, 35)
+submitButton.Position = UDim2.new(0, 10, 0, 60)
+submitButton.Text = "Enter"
+submitButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+submitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+submitButton.BorderSizePixel = 0
+
+submitButton.MouseButton1Click:Connect(function()
+    if keyBox.Text == keyCode then
+        saveKey()                  -- บันทึก key ลง session
+        keyGui:Destroy()           -- ปิดหน้าต่าง key
+        screenGui.Enabled = true   -- เปิด GUI หลัก
+    else
+        submitButton.Text = "Huh"
+        wait(1.5)
+        submitButton.Text = "Enter"
+        keyBox.Text = ""
+    end
+end)
+
+if hasValidKey() then
+    screenGui.Enabled = true -- เปิด GUI หลักเลย
+else
+    screenGui.Enabled = false -- ซ่อนไว้ก่อน จนใส่รหัส
+end
+-- ปิด GUI หลักไว้ก่อน จนกว่าจะผ่านรหัส
+screenGui.Enabled = false
+
+local copyLinkButton = Instance.new("TextButton", keyFrame)
+copyLinkButton.Size = UDim2.new(1, -20, 0, 25)
+copyLinkButton.Position = UDim2.new(0, 10, 0, 100)
+copyLinkButton.Text = "Get key"
+copyLinkButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+copyLinkButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+copyLinkButton.BorderSizePixel = 0
+
+copyLinkButton.MouseButton1Click:Connect(function()
+    local keyURL = "https://your-link.com/getkey" -- 🔁 เปลี่ยนเป็นลิงก์ขอคีย์จริงของคุณ
+    if setclipboard then
+        setclipboard(keyURL)
+        copyLinkButton.Text = "Copied!"
+        wait(1.5)
+        copyLinkButton.Text = "Get key"
+    else
+        copyLinkButton.Text = "error ไม่รองรับ setclipboard"
+        wait(1.5)
+        copyLinkButton.Text = "Get key"
+    end
+end)
