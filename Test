@@ -1,0 +1,161 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+local targetPlayerName = nil
+local active = false
+
+local function getRandomBehindPosition(targetHRP)
+    local backVector = -targetHRP.CFrame.LookVector.Unit
+    local angle = math.rad(math.random(-90, 90))
+    local rotatedVector = CFrame.fromAxisAngle(Vector3.new(0, 1, 0), angle):VectorToWorldSpace(backVector)
+    local radius = math.random(2, 5)
+    local offset = rotatedVector * radius
+    return Vector3.new(targetHRP.Position.X + offset.X, targetHRP.Position.Y, targetHRP.Position.Z + offset.Z)
+end
+
+local function lookAtTarget(localChar, targetChar)
+    local root = localChar:FindFirstChild("HumanoidRootPart")
+    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+    if root and targetRoot then
+        root.CFrame = CFrame.new(root.Position, Vector3.new(targetRoot.Position.X, root.Position.Y, targetRoot.Position.Z))
+    end
+end
+
+local function highlightTargetPlayer(targetPlayer)
+    if targetPlayer and targetPlayer.Character and not targetPlayer.Character:FindFirstChild("Target_Highlight") then
+        local h = Instance.new("Highlight")
+        h.Name = "Target_Highlight"
+        h.FillColor = Color3.fromRGB(255, 0, 0)
+        h.FillTransparency = 0.8
+        h.OutlineColor = Color3.fromRGB(0, 0, 0)
+        h.OutlineTransparency = 0
+        h.Adornee = targetPlayer.Character
+        h.Parent = targetPlayer.Character
+    end
+end
+
+local function removeHighlight()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character then
+            local h = player.Character:FindFirstChild("Target_Highlight")
+            if h then h:Destroy() end
+        end
+    end
+end
+
+local function stopEverything()
+    active = false
+    removeHighlight()
+    targetPlayerName = nil
+
+    task.defer(function()
+        if LocalPlayer.Character then
+            local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            Camera.CameraSubject = humanoid or hrp or LocalPlayer.Character
+            Camera.CameraType = Enum.CameraType.Custom
+        end
+    end)
+end
+
+RunService.Heartbeat:Connect(function()
+    if not active or not targetPlayerName then return end
+
+    local targetPlayer = Players:FindFirstChild(targetPlayerName)
+    if targetPlayer and targetPlayer.Character and LocalPlayer.Character then
+        highlightTargetPlayer(targetPlayer)
+
+        local targetHRP = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local localHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+        if targetHRP and localHRP then
+            local newPos = getRandomBehindPosition(targetHRP)
+            localHRP.CFrame = CFrame.new(newPos)
+            lookAtTarget(LocalPlayer.Character, targetPlayer.Character)
+
+            local head = targetPlayer.Character:FindFirstChild("Head")
+            if head then
+                Camera.CameraSubject = head
+                Camera.CameraType = Enum.CameraType.Attach
+            end
+        end
+    end
+end)
+
+local screenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+screenGui.Name = "WarpControlGui"
+screenGui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame", screenGui)
+frame.Size = UDim2.new(0, 200, 0, 90)
+frame.Position = UDim2.new(0.3, 0, 0.3, 0)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+
+local textBox = Instance.new("TextBox", frame)
+textBox.Size = UDim2.new(1, -10, 0, 40)
+textBox.Position = UDim2.new(0, 5, 0, 5)
+textBox.PlaceholderText = "Credit By Lunarplyr"
+textBox.Text = ""
+textBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+textBox.BorderSizePixel = 0
+textBox.ClearTextOnFocus = false
+
+local toggleButton = Instance.new("TextButton", frame)
+toggleButton.Size = UDim2.new(1, -10, 0, 30)
+toggleButton.Position = UDim2.new(0, 5, 0, 50)
+toggleButton.Text = "▶️ เริ่มวาร์ป"
+toggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.BorderSizePixel = 0
+
+toggleButton.MouseButton1Click:Connect(function()
+    if not active then
+        local name = textBox.Text
+        if Players:FindFirstChild(name) then
+            targetPlayerName = name
+            active = true
+            toggleButton.Text = "⏹️ หยุดวาร์ป"
+        else
+            toggleButton.Text = "❌ ไม่เจอชื่อ"
+            wait(1.5)
+            toggleButton.Text = "▶️ เริ่มวาร์ป"
+        end
+    else
+        stopEverything()
+        toggleButton.Text = "▶️ เริ่มวาร์ป"
+    end
+end)
+
+local miniToggle = Instance.new("TextButton", screenGui)
+miniToggle.Size = UDim2.new(0, 40, 0, 40)
+miniToggle.Position = UDim2.new(0, 20, 0.5, -20)
+miniToggle.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+miniToggle.Text = "💩"
+miniToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+miniToggle.BorderSizePixel = 0
+miniToggle.AutoButtonColor = true
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10) 
+corner.Parent = miniToggle
+
+miniToggle.Active = true
+miniToggle.Draggable = true
+
+frame.Visible = false
+
+miniToggle.MouseButton1Click:Connect(function()
+    frame.Visible = not frame.Visible
+    if frame.Visible then
+        miniToggle.Text = "❌" 
+    else
+        miniToggle.Text = "💩" 
+    end
+end)
