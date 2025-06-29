@@ -125,9 +125,31 @@ toggleButton.BorderSizePixel = 0
 
 toggleButton.MouseButton1Click:Connect(function()
     if not active then
-        local name = textBox.Text
-        if Players:FindFirstChild(name) then
-            targetPlayerName = name
+        local name = textBox.Text:lower()
+
+        local matchedPlayer = nil
+
+        -- Step 1: หาจาก Username ก่อน
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player.Name:lower() == name then
+                matchedPlayer = player
+                break
+            end
+        end
+
+        -- Step 2: ถ้าไม่เจอ Username → ลอง DisplayName
+        if not matchedPlayer then
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player.DisplayName:lower() == name then
+                    matchedPlayer = player
+                    break -- เอาคนแรกที่เจอ
+                end
+            end
+        end
+
+        -- Step 3: ถ้าเจอเป้าหมาย → เริ่มวาร์ป
+        if matchedPlayer then
+            targetPlayerName = matchedPlayer.Name
             active = true
             toggleButton.Text = "⏹️ หยุดวาร์ป"
         else
