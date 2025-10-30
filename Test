@@ -176,28 +176,37 @@ F.BackgroundColor3 = Color3.fromRGB(30,30,30)
 F.Active, F.Draggable = true, true
 Instance.new("UICorner", F).CornerRadius = UDim.new(0,8)
 
--- 🧲 Smooth Drag
+---------------------------------
+-- 🧲 Smooth Drag (Ray UI Style)
+---------------------------------
+local UIS = game:GetService("UserInputService")
+local TS = game:GetService("TweenService")
+
 local dragging, dragStart, startPos
+
 local function updateDrag(input)
 	if not dragging then return end
 	local delta = input.Position - dragStart
 	local goal = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-	TweenService:Create(F, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = goal}):Play()
+	TS:Create(F, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = goal}):Play()
 end
+
 F.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		dragging = true
 		dragStart = input.Position
 		startPos = F.Position
 		input.Changed:Connect(function()
-			if input.UserInputState == Enum.UserInputState.End then dragging = false end
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
 		end)
 	end
 end)
+
 F.InputChanged:Connect(updateDrag)
 UIS.InputChanged:Connect(updateDrag)
 
--- 🧾 Title
 local T = Instance.new("TextLabel", F)
 T.Size = UDim2.new(1,0,0,28)
 T.Position = UDim2.new(0,0,0,6)
@@ -207,7 +216,6 @@ T.TextSize = 18
 T.TextColor3 = Color3.fromRGB(255,150,80)
 T.Text = "WarpControl (DXD)"
 
--- 🧭 Input
 local inputFrame = Instance.new("Frame", F)
 inputFrame.Size = UDim2.new(1,-16,0,36)
 inputFrame.Position = UDim2.new(0,8,0,36)
@@ -223,9 +231,21 @@ textBox.TextYAlignment = Enum.TextYAlignment.Center
 textBox.ClearTextOnFocus = false
 textBox.Font = Enum.Font.Gotham
 textBox.TextSize = 10
+textBox.Text = ""
 Instance.new("UICorner", textBox).CornerRadius = UDim.new(0,6)
 
--- 💠 Dropdown button
+local uiStroke = Instance.new("UIStroke", textBox)
+uiStroke.Thickness, uiStroke.ApplyStrokeMode = 1.6, Enum.ApplyStrokeMode.Border
+uiStroke.Color = Color3.fromRGB(60,60,60)
+
+textBox.Focused:Connect(function()
+	TweenService:Create(uiStroke,TweenInfo.new(0.2),{Color=Color3.fromRGB(100,200,255),Thickness=2.5}):Play()
+end)
+textBox.FocusLost:Connect(function()
+	TweenService:Create(uiStroke,TweenInfo.new(0.2),{Color=Color3.fromRGB(60,60,60),Thickness=1.6}):Play()
+end)
+
+-- 👇 ปุ่ม ddBtn อยู่ตรงนี้
 local ddBtn = Instance.new("TextButton", inputFrame)
 ddBtn.Size = UDim2.new(0,80,1,0)
 ddBtn.Position = UDim2.new(1,-80,0,0)
@@ -236,7 +256,7 @@ ddBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
 ddBtn.TextColor3 = Color3.fromRGB(255,255,255)
 Instance.new("UICorner", ddBtn).CornerRadius = UDim.new(0,6)
 
--- 🧱 Dropdown
+-- 👇 dropdown ต้องอยู่สร้างก่อน
 local dropdown = Instance.new("Frame", F)
 dropdown.Size = UDim2.new(1,-16,0,140)
 dropdown.Position = UDim2.new(0,8,0,76)
@@ -244,70 +264,155 @@ dropdown.BackgroundColor3 = Color3.fromRGB(20,20,20)
 dropdown.Visible = false
 Instance.new("UICorner", dropdown).CornerRadius = UDim.new(0,8)
 
--- ✨ Glow รอบ dropdown
-local ddFrameStroke = Instance.new("UIStroke", dropdown)
-ddFrameStroke.Thickness = 2
-ddFrameStroke.Color = Color3.fromRGB(0,0,0)
-ddFrameStroke.Enabled = false
-local function setDropdownGlow(state)
-	if state then
-		ddFrameStroke.Enabled = true
-		TweenService:Create(ddFrameStroke, TweenInfo.new(0.3), {Color=Color3.fromRGB(0,180,255),Thickness=3}):Play()
+-- 👇 แล้วค่อยวาง effect ของ ddBtn ตรงนี้หลังจาก dropdown ถูกสร้างแล้ว
+local ddStroke = Instance.new("UIStroke", ddBtn)
+ddStroke.Thickness = 1.8
+ddStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+ddStroke.Color = Color3.fromRGB(80,80,80)
+
+-- hover + glow logic
+ddBtn.MouseEnter:Connect(function()
+	game:GetService("TweenService"):Create(ddStroke, TweenInfo.new(0.25),
+		{Color = Color3.fromRGB(100,200,255), Thickness = 2.5}
+	):Play()
+end)
+ddBtn.MouseLeave:Connect(function()
+	game:GetService("TweenService"):Create(ddStroke, TweenInfo.new(0.25),
+		{Color = Color3.fromRGB(80,80,80), Thickness = 1.8}
+	):Play()
+end)
+ddBtn.MouseButton1Click:Connect(function()
+	dropdown.Visible = not dropdown.Visible
+	if dropdown.Visible then
+		refreshDD()
+		game:GetService("TweenService"):Create(ddStroke, TweenInfo.new(0.25),
+			{Color = Color3.fromRGB(0,180,255), Thickness = 2.8}
+		):Play()
 	else
-		TweenService:Create(ddFrameStroke, TweenInfo.new(0.3), {Color=Color3.fromRGB(0,0,0),Thickness=1.5}):Play()
-		task.delay(0.3, function() ddFrameStroke.Enabled = false end)
+		game:GetService("TweenService"):Create(ddStroke, TweenInfo.new(0.25),
+			{Color = Color3.fromRGB(80,80,80), Thickness = 1.8}
+		):Play()
 	end
+end)
+
+-------------------------------
+-- 👥 Dropdown list (with avatar & glow)
+-------------------------------
+local dropdown = Instance.new("Frame")
+dropdown.Size = UDim2.new(1,-16,0,140)
+dropdown.Position = UDim2.new(0,8,0,76)
+dropdown.BackgroundColor3 = Color3.fromRGB(20,20,20)
+dropdown.BorderSizePixel = 0
+dropdown.Visible = false
+dropdown.ZIndex = 100
+dropdown.Parent = F
+Instance.new("UICorner", dropdown).CornerRadius = UDim.new(0,8)
+
+-- 🌟 Glow รอบ dropdown
+local ddGlow = Instance.new("UIStroke")
+ddGlow.Thickness = 2.5
+ddGlow.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+ddGlow.Color = Color3.fromRGB(0,180,255)
+ddGlow.Transparency = 1
+ddGlow.Parent = dropdown
+
+-- 🌀 ฟังก์ชันเปิด/ปิด glow
+local function setDropdownGlow(state)
+	TweenService:Create(ddGlow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+		state and {Transparency = 0.2} or {Transparency = 1}
+	):Play()
 end
 
--- 📜 Scroll
-local scroll = Instance.new("ScrollingFrame", dropdown)
+local scroll = Instance.new("ScrollingFrame")
 scroll.Size = UDim2.new(1,-8,1,-8)
 scroll.Position = UDim2.new(0,4,0,4)
 scroll.BackgroundTransparency = 1
 scroll.ScrollBarThickness = 6
 scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-local list = Instance.new("UIListLayout", scroll)
+scroll.ZIndex = 101
+scroll.Parent = dropdown
+
+local list = Instance.new("UIListLayout")
 list.Padding = UDim.new(0,4)
 list.SortOrder = Enum.SortOrder.LayoutOrder
+list.Parent = scroll
 
--- 👤 Player entries
+-- 👤 ช่องผู้เล่นใน dropdown
 local function makeEntry(p)
-	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(1,-8,0,32)
+	local btn = Instance.new("Frame")
+	btn.Size = UDim2.new(1,-8,0,40)
 	btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-	btn.TextColor3 = Color3.fromRGB(255,255,255)
-	btn.Text = p.DisplayName .. " (" .. p.Name .. ")"
-	btn.Font = Enum.Font.Gotham
-	btn.TextSize = 14
+	btn.ZIndex = 102
 	btn.Parent = scroll
 	Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
-	btn.MouseButton1Click:Connect(function()
+
+	-- รูปโปรไฟล์
+	local avatar = Instance.new("ImageLabel", btn)
+	avatar.Size = UDim2.new(0,32,0,32)
+	avatar.Position = UDim2.new(0,4,0.5,-16)
+	avatar.BackgroundTransparency = 1
+	avatar.ZIndex = 103
+
+	task.spawn(function()
+		local ok, thumb = pcall(function()
+			return Players:GetUserThumbnailAsync(p.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
+		end)
+		if ok and thumb then
+			avatar.Image = thumb
+		end
+	end)
+
+	-- ชื่อผู้เล่น
+	local name = Instance.new("TextButton", btn)
+	name.Size = UDim2.new(1,-44,1,0)
+	name.Position = UDim2.new(0,40,0,0)
+	name.BackgroundTransparency = 1
+	name.Text = p.DisplayName .. " (" .. p.Name .. ")"
+	name.Font = Enum.Font.Gotham
+	name.TextSize = 14
+	name.TextColor3 = Color3.fromRGB(255,255,255)
+	name.TextXAlignment = Enum.TextXAlignment.Left
+	name.ZIndex = 104
+
+	name.MouseButton1Click:Connect(function()
 		textBox.Text = p.Name
 		targetPlayerName = p.Name
 		dropdown.Visible = false
-		setDropdownGlow(false)
+		setDropdownGlow(false) -- 🔵 ปิด glow ตอนปิด
 	end)
 end
 
 local function refreshDD()
-	for _,c in ipairs(scroll:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
-	for _,pl in ipairs(Players:GetPlayers()) do if pl ~= LP then makeEntry(pl) end end
+	for _,c in ipairs(scroll:GetChildren()) do
+		if c:IsA("Frame") then c:Destroy() end
+	end
+	for _,pl in ipairs(Players:GetPlayers()) do
+		if pl ~= LP then
+			makeEntry(pl)
+		end
+	end
 end
 
--- 🧩 Dropdown toggle
 ddBtn.MouseButton1Click:Connect(function()
+	dropdown.Visible = not dropdown.Visible
+	setDropdownGlow(dropdown.Visible) -- 💫 เปิด/ปิด glow ตามสถานะ
 	if dropdown.Visible then
-		dropdown.Visible = false
-		setDropdownGlow(false)
-	else
 		refreshDD()
-		dropdown.Visible = true
-		setDropdownGlow(true)
 	end
 end)
 
-Players.PlayerAdded:Connect(function() if dropdown.Visible then refreshDD() end end)
-Players.PlayerRemoving:Connect(function() if dropdown.Visible then refreshDD() end end)
+Players.PlayerAdded:Connect(function()
+	if dropdown.Visible then refreshDD() end
+end)
+Players.PlayerRemoving:Connect(function()
+	if dropdown.Visible then refreshDD() end
+end)
+
+task.delay(1,function()
+	if not dropdown.Visible then
+		refreshDD()
+	end
+end)
 
 -------------------------------
 -- ▶ Execute Button
@@ -320,12 +425,33 @@ exe.Font = Enum.Font.GothamBold
 exe.TextSize = 16
 exe.BackgroundColor3 = Color3.fromRGB(100,200,255)
 exe.TextColor3 = Color3.fromRGB(20,20,20)
+exe.TextStrokeTransparency = 1
+exe.ZIndex = 1
 Instance.new("UICorner", exe).CornerRadius = UDim.new(0,8)
+
+-- 🌟 เอฟเฟกต์แสงตอนเริ่มวาร์ป (Execute Glow)
+local exeStroke = Instance.new("UIStroke", exe)
+exeStroke.Thickness = 1.8
+exeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+exeStroke.Color = Color3.fromRGB(80,80,80) -- ปกติยังไม่เรือง
+
+local function setExecuteGlow(state)
+	local tween = game:GetService("TweenService"):Create(
+		exeStroke,
+		TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+		state and
+			{ Color = Color3.fromRGB(255,140,60), Thickness = 3 } -- ตอนทำงาน: ส้มเรืองแสง
+			or
+			{ Color = Color3.fromRGB(80,80,80), Thickness = 1.8 }  -- ปกติ: มืดๆ
+	)
+	tween:Play()
+end
 
 local exeStroke = Instance.new("UIStroke", exe)
 exeStroke.Thickness = 1.8
 exeStroke.Color = Color3.fromRGB(80,80,80)
-local function setExecuteGlow(on)
+
+local function setGlow(on)
 	TweenService:Create(exeStroke,TweenInfo.new(0.3), on and
 		{Color=Color3.fromRGB(255,140,60),Thickness=3} or
 		{Color=Color3.fromRGB(80,80,80),Thickness=1.8}
@@ -340,6 +466,7 @@ exe.MouseButton1Click:Connect(function()
 		exe.BackgroundColor3 = Color3.fromRGB(100,200,255)
 		return
 	end
+
 	local name = textBox.Text:match("%S+")
 	if not name then
 		exe.Text = "⚠ No Target"
@@ -349,6 +476,7 @@ exe.MouseButton1Click:Connect(function()
 		exe.BackgroundColor3 = Color3.fromRGB(100,200,255)
 		return
 	end
+
 	local t = Players:FindFirstChild(name)
 	if not (t and t.Character) then
 		exe.Text = "❌ Invalid Target"
@@ -358,15 +486,16 @@ exe.MouseButton1Click:Connect(function()
 		exe.BackgroundColor3 = Color3.fromRGB(100,200,255)
 		return
 	end
+
 	targetPlayerName = name
 	active = true
-	setExecuteGlow(true)
+	setExecuteGlow(true) -- ✅ เปิดแสง
 	exe.Text = "⏹ Stop"
 	exe.BackgroundColor3 = Color3.fromRGB(255,100,100)
 end)
 
 -------------------------------
--- 🔑 Key UI
+-- 🔑 Simple Key UI
 -------------------------------
 if not hasValidKey() then
 	local keyGui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
@@ -380,6 +509,7 @@ if not hasValidKey() then
 	local title = Instance.new("TextLabel", frame)
 	title.Size = UDim2.new(1,0,0,30)
 	title.Text = "Enter Key"
+    textBox.Text = ""
 	title.Font = Enum.Font.GothamBold
 	title.TextColor3 = Color3.fromRGB(0,180,255)
 	title.BackgroundTransparency = 1
