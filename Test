@@ -1,415 +1,385 @@
--- 🌀 DXD WarpControl vFinal (Ready-to-Run)
--- Includes: Dropdown Warp Selector + DXD Key Access GUI + Camera Control
--- Made by Lunarplyr ✦ Optimized and Styled by ChatGPT DXD Edition
+--[[ 
+   🚀 DXD WarpControl (Classic Key Edition)
+   - ใช้ Key GUI แบบเรียบง่าย (no animation)
+   - DXD Warp UI ล่าสุดพร้อม Dropdown / Execute Glow / Error Color
+   - พร้อมรัน 100%
+]]
 
--- CONFIG
+-------------------------------
+-- 🔐 Key Config
+-------------------------------
 local keyCode = "222554"
 local keyFileName = "warp_key_cache.txt"
 
--- File ops
 local canUseFile = (type(isfile) == "function") and (type(readfile) == "function") and (type(writefile) == "function")
 local function getTodayString()
 	local d = os.date("*t")
 	return string.format("%04d-%02d-%02d", d.year, d.month, d.day)
 end
 local function hasValidKey()
-	if not canUseFile or not isfile(keyFileName) then return false end
-	local ok, data = pcall(readfile, keyFileName)
-	if not ok or not data then return false end
-	local parts = string.split(data,"|")
-	return parts[1]==keyCode and parts[2]==getTodayString()
+	if not canUseFile then return false end
+	if not isfile(keyFileName) then return false end
+	local ok, content = pcall(readfile, keyFileName)
+	if not ok or not content then return false end
+	local parts = string.split(content, "|")
+	return parts[1] == keyCode and parts[2] == getTodayString()
 end
 local function saveKey()
-	if not canUseFile then return end
-	pcall(writefile,keyFileName,keyCode.."|"..getTodayString())
+	if canUseFile then
+		pcall(writefile, keyFileName, keyCode.."|"..getTodayString())
+	end
 end
 
--- Clean GUIs
+-------------------------------
+-- 💥 Cleanup Old UIs
+-------------------------------
 pcall(function()
-	local pg = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
-	if pg then
-		for _,v in ipairs({"WarpControlGui","KeySystem"}) do
-			local old = pg:FindFirstChild(v)
-			if old then old:Destroy() task.wait(0.2) end
-		end
+	for _, name in ipairs({"WarpControlGui", "KeySystem"}) do
+		local g = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui"):FindFirstChild(name)
+		if g then g:Destroy() end
 	end
 end)
 
--- Services
+-------------------------------
+-- 🧠 Services & State
+-------------------------------
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
+local UIS = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
+local Cam = workspace.CurrentCamera
 
--- State
-local active=false
-local targetPlayerName=nil
-local cameraDistance=6
-local cameraRotation=Vector2.new(0,0)
-local lastTouch=nil
+local active = false
+local targetPlayerName = nil
 
--- Utils
-local function getRandomBehindPosition(hrp)
-	local back = -hrp.CFrame.LookVector
-	local ang = math.rad(math.random(-90,90))
-	local rot = CFrame.fromAxisAngle(Vector3.new(0,1,0),ang):VectorToWorldSpace(back)
-	return hrp.Position + rot * math.random(3,7)
+-------------------------------
+-- ⚙️ Helper Functions
+-------------------------------
+local function getRandomBehindPosition(targetHRP)
+	local back = -targetHRP.CFrame.LookVector
+	local angle = math.rad(math.random(-90, 90))
+	local rotated = CFrame.fromAxisAngle(Vector3.new(0,1,0), angle):VectorToWorldSpace(back)
+	local dist = math.random(3,7)
+	return targetHRP.Position + rotated * dist
 end
-local function lookAtTarget(localChar,targetChar)
+
+local function lookAtTarget(localChar, targetChar)
 	local root = localChar:FindFirstChild("HumanoidRootPart")
-	local troot = targetChar:FindFirstChild("HumanoidRootPart")
-	if root and troot then
-		root.CFrame = CFrame.new(root.Position,Vector3.new(troot.Position.X,root.Position.Y,troot.Position.Z))
+	local tRoot = targetChar:FindFirstChild("HumanoidRootPart")
+	if root and tRoot then
+		root.CFrame = CFrame.new(root.Position, Vector3.new(tRoot.Position.X, root.Position.Y, tRoot.Position.Z))
 	end
 end
+
 local function highlightTarget(plr)
-	if plr.Character and not plr.Character:FindFirstChild("Target_Highlight") then
-		local h=Instance.new("Highlight")
-		h.Name="Target_Highlight"
-		h.FillColor=Color3.fromRGB(255,0,0)
-		h.FillTransparency=0.8
-		h.OutlineColor=Color3.fromRGB(0,0,0)
-		h.Adornee=plr.Character
-		h.Parent=plr.Character
+	if not (plr and plr.Character) then return end
+	if not plr.Character:FindFirstChild("Target_Highlight") then
+		local h = Instance.new("Highlight")
+		h.Name = "Target_Highlight"
+		h.FillColor = Color3.fromRGB(255, 0, 0)
+		h.FillTransparency = 0.8
+		h.OutlineColor = Color3.fromRGB(0, 0, 0)
+		h.Adornee = plr.Character
+		h.Parent = plr.Character
 	end
 end
-local function removeHighlight()
-	for _,p in ipairs(Players:GetPlayers()) do
+
+local function clearHighlights()
+	for _, p in ipairs(Players:GetPlayers()) do
 		if p.Character then
-			local h=p.Character:FindFirstChild("Target_Highlight")
+			local h = p.Character:FindFirstChild("Target_Highlight")
 			if h then h:Destroy() end
 		end
 	end
 end
-local function stopEverything()
-	active=false
-	removeHighlight()
-	targetPlayerName=nil
-	task.defer(function()
-		pcall(function()
-			if LocalPlayer.Character then
-				Camera.CameraType=Enum.CameraType.Custom
-				local hum=LocalPlayer.Character:FindFirstChildWhichIsA("Humanoid")
-				local head=LocalPlayer.Character:FindFirstChild("Head")
-				Camera.CameraSubject=head or hum or LocalPlayer.Character
-			end
-		end)
+
+local function stopWarp()
+	active = false
+	targetPlayerName = nil
+	clearHighlights()
+	pcall(function()
+		Cam.CameraType = Enum.CameraType.Custom
+		local hum = LP.Character and LP.Character:FindFirstChildWhichIsA("Humanoid")
+		local head = LP.Character and LP.Character:FindFirstChild("Head")
+		Cam.CameraSubject = head or hum or LP.Character
 	end)
 end
 
--- Camera control (PC/Mobile)
-UserInputService.InputChanged:Connect(function(input,gp)
-	if gp then return end
-	if input.UserInputType==Enum.UserInputType.MouseMovement and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-		cameraRotation=cameraRotation-Vector2.new(input.Delta.x,input.Delta.y)*0.2
-	elseif input.UserInputType==Enum.UserInputType.Touch then
+-------------------------------
+-- 🎥 Camera Orbit Controls
+-------------------------------
+local camRot = Vector2.new(0, 0)
+local camDist = 6
+local lastTouch = nil
+local rotSpeed, zoomSpeed = 0.2, 0.8
+
+UIS.InputChanged:Connect(function(input, processed)
+	if processed then return end
+	if input.UserInputType == Enum.UserInputType.MouseMovement and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+		camRot -= Vector2.new(input.Delta.x, input.Delta.y) * rotSpeed
+	elseif input.UserInputType == Enum.UserInputType.Touch then
 		if lastTouch then
-			local d=input.Position-lastTouch
-			cameraRotation=cameraRotation-Vector2.new(d.X,d.Y)*0.1
+			local delta = input.Position - lastTouch
+			camRot -= Vector2.new(delta.X, delta.Y) * (rotSpeed * 0.6)
 		end
-		lastTouch=input.Position
-	elseif input.UserInputType==Enum.UserInputType.MouseWheel then
-		cameraDistance=math.clamp(cameraDistance-input.Position.Z*2,2,25)
+		lastTouch = input.Position
+	end
+	if input.UserInputType == Enum.UserInputType.MouseWheel then
+		camDist = math.clamp(camDist - input.Position.Z * 2, 2, 25)
 	end
 end)
-UserInputService.TouchPinch:Connect(function(_,scale)
-	cameraDistance=math.clamp(cameraDistance/scale,2,25)
+UIS.TouchPinch:Connect(function(_, scale)
+	camDist = math.clamp(camDist / scale, 2, 25)
 end)
-UserInputService.TouchEnded:Connect(function() lastTouch=nil end)
+UIS.TouchEnded:Connect(function() lastTouch = nil end)
 
--- Warp Loop
+-------------------------------
+-- 🌀 Warp Loop
+-------------------------------
 RunService.Heartbeat:Connect(function()
 	if not active or not targetPlayerName then return end
-	local t=Players:FindFirstChild(targetPlayerName)
-	if not (t and t.Character and LocalPlayer.Character) then return end
-	highlightTarget(t)
-	local th=t.Character:FindFirstChild("HumanoidRootPart")
-	local lh=LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	local tp = Players:FindFirstChild(targetPlayerName)
+	if not (tp and tp.Character and LP.Character) then return end
+
+	highlightTarget(tp)
+	local th = tp.Character:FindFirstChild("HumanoidRootPart")
+	local lh = LP.Character:FindFirstChild("HumanoidRootPart")
+	local head = tp.Character:FindFirstChild("Head")
 	if th and lh then
-		pcall(function()
-			lh.CFrame=CFrame.new(getRandomBehindPosition(th))
-		end)
-		lookAtTarget(LocalPlayer.Character,t.Character)
+		pcall(function() lh.CFrame = CFrame.new(getRandomBehindPosition(th)) end)
+		lookAtTarget(LP.Character, tp.Character)
 	end
-	local head=t.Character:FindFirstChild("Head")
+
 	if head then
-		Camera.CameraType=Enum.CameraType.Scriptable
-		local pos=head.Position+Vector3.new(0,1.5,0)
-		local rx=CFrame.Angles(0,math.rad(cameraRotation.X),0)
-		local ry=CFrame.Angles(math.rad(cameraRotation.Y),0,0)
-		local off=rx*ry*Vector3.new(0,0,cameraDistance)
-		Camera.CFrame=CFrame.new(pos+off,pos)
+		Cam.CameraType = Enum.CameraType.Scriptable
+		local headPos = head.Position + Vector3.new(0,1.5,0)
+		local rotX = CFrame.Angles(0, math.rad(camRot.X), 0)
+		local rotY = CFrame.Angles(math.rad(camRot.Y), 0, 0)
+		local offset = rotX * rotY * Vector3.new(0, 0, camDist)
+		Cam.CFrame = CFrame.new(headPos + offset, headPos)
 	end
 end)
 
--- Build UI (unchanged execute)
-local sg=Instance.new("ScreenGui",LocalPlayer.PlayerGui)
-sg.Name="WarpControlGui"
-sg.ResetOnSpawn=false
-sg.Enabled=false
+-------------------------------
+-- 🧱 Build GUI
+-------------------------------
+local SG = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
+SG.Name = "WarpControlGui"
+SG.ResetOnSpawn = false
+SG.Enabled = false
 
-local frame=Instance.new("Frame",sg)
-frame.Size=UDim2.new(0,300,0,140)
-frame.Position=UDim2.new(0.3,0,0.3,0)
-frame.BackgroundColor3=Color3.fromRGB(30,30,30)
-frame.Active=true frame.Draggable=true
-Instance.new("UICorner",frame).CornerRadius=UDim.new(0,8)
+local F = Instance.new("Frame", SG)
+F.Size = UDim2.new(0,300,0,140)
+F.Position = UDim2.new(0.3,0,0.3,0)
+F.BackgroundColor3 = Color3.fromRGB(30,30,30)
+F.Active, F.Draggable = true, true
+Instance.new("UICorner", F).CornerRadius = UDim.new(0,8)
 
-local title=Instance.new("TextLabel",frame)
-title.Size=UDim2.new(1,0,0,28)
-title.BackgroundTransparency=1
-title.Font=Enum.Font.GothamBold
-title.TextSize=18
-title.TextColor3=Color3.fromRGB(255,150,80)
-title.Text="WarpControl (DXD)"
+local T = Instance.new("TextLabel", F)
+T.Size = UDim2.new(1,0,0,28)
+T.Position = UDim2.new(0,0,0,6)
+T.BackgroundTransparency = 1
+T.Font = Enum.Font.GothamBold
+T.TextSize = 18
+T.TextColor3 = Color3.fromRGB(255,150,80)
+T.Text = "WarpControl (DXD)"
 
-local inputFrame=Instance.new("Frame",frame)
-inputFrame.Size=UDim2.new(1,-16,0,36)
-inputFrame.Position=UDim2.new(0,8,0,36)
-inputFrame.BackgroundTransparency=1
+local inputFrame = Instance.new("Frame", F)
+inputFrame.Size = UDim2.new(1,-16,0,36)
+inputFrame.Position = UDim2.new(0,8,0,36)
+inputFrame.BackgroundTransparency = 1
 
-local tb=Instance.new("TextBox",inputFrame)
-tb.Size=UDim2.new(1,-90,1,0)
-tb.PlaceholderText="Type username or pick from dropdown"
-tb.BackgroundColor3=Color3.fromRGB(45,45,45)
-tb.TextColor3=Color3.new(1,1,1)
-tb.TextXAlignment=Enum.TextXAlignment.Center
-tb.TextYAlignment=Enum.TextYAlignment.Center
-tb.Font=Enum.Font.Gotham tb.TextSize=10 tb.Text=""
-Instance.new("UICorner",tb).CornerRadius=UDim.new(0,6)
-local stroke=Instance.new("UIStroke",tb)
-stroke.Color=Color3.fromRGB(60,60,60) stroke.Thickness=1.6
-tb.Focused:Connect(function()
-	TweenService:Create(stroke,TweenInfo.new(0.25),{Color=Color3.fromRGB(100,200,255),Thickness=2.5}):Play()
+local textBox = Instance.new("TextBox", inputFrame)
+textBox.Size = UDim2.new(1,-90,1,0)
+textBox.PlaceholderText = "Type username or pick from dropdown"
+textBox.BackgroundColor3 = Color3.fromRGB(45,45,45)
+textBox.TextColor3 = Color3.fromRGB(255,255,255)
+textBox.TextXAlignment = Enum.TextXAlignment.Center
+textBox.TextYAlignment = Enum.TextYAlignment.Center
+textBox.ClearTextOnFocus = false
+textBox.Font = Enum.Font.Gotham
+textBox.TextSize = 10
+textBox.Text = ""
+Instance.new("UICorner", textBox).CornerRadius = UDim.new(0,6)
+
+local uiStroke = Instance.new("UIStroke", textBox)
+uiStroke.Thickness, uiStroke.ApplyStrokeMode = 1.6, Enum.ApplyStrokeMode.Border
+uiStroke.Color = Color3.fromRGB(60,60,60)
+
+textBox.Focused:Connect(function()
+	TweenService:Create(uiStroke,TweenInfo.new(0.2),{Color=Color3.fromRGB(100,200,255),Thickness=2.5}):Play()
 end)
-tb.FocusLost:Connect(function()
-	TweenService:Create(stroke,TweenInfo.new(0.25),{Color=Color3.fromRGB(60,60,60),Thickness=1.6}):Play()
+textBox.FocusLost:Connect(function()
+	TweenService:Create(uiStroke,TweenInfo.new(0.2),{Color=Color3.fromRGB(60,60,60),Thickness=1.6}):Play()
 end)
 
--- Dropdown
-local ddBtn=Instance.new("TextButton",inputFrame)
-ddBtn.Size=UDim2.new(0,80,1,0)
-ddBtn.Position=UDim2.new(1,-80,0,0)
-ddBtn.Text="▼ Players"
-ddBtn.Font=Enum.Font.GothamBold
-ddBtn.TextSize=14
-ddBtn.BackgroundColor3=Color3.fromRGB(70,70,70)
-ddBtn.TextColor3=Color3.new(1,1,1)
-Instance.new("UICorner",ddBtn).CornerRadius=UDim.new(0,6)
-local dropdown=Instance.new("Frame",frame)
-dropdown.Size=UDim2.new(1,-16,0,140)
-dropdown.Position=UDim2.new(0,8,0,76)
-dropdown.BackgroundColor3=Color3.fromRGB(20,20,20)
-dropdown.Visible=false Instance.new("UICorner",dropdown).CornerRadius=UDim.new(0,8)
-local scroll=Instance.new("ScrollingFrame",dropdown)
-scroll.Size=UDim2.new(1,-8,1,-8)
-scroll.Position=UDim2.new(0,4,0,4)
-scroll.AutomaticCanvasSize=Enum.AutomaticSize.Y
-scroll.ScrollBarThickness=6
-Instance.new("UIListLayout",scroll).Padding=UDim.new(0,4)
+local ddBtn = Instance.new("TextButton", inputFrame)
+ddBtn.Size = UDim2.new(0,80,1,0)
+ddBtn.Position = UDim2.new(1,-80,0,0)
+ddBtn.Text = "▼ Players"
+ddBtn.Font = Enum.Font.GothamBold
+ddBtn.TextSize = 14
+ddBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+ddBtn.TextColor3 = Color3.fromRGB(255,255,255)
+Instance.new("UICorner", ddBtn).CornerRadius = UDim.new(0,6)
 
+local dropdown = Instance.new("Frame", F)
+dropdown.Size = UDim2.new(1,-16,0,140)
+dropdown.Position = UDim2.new(0,8,0,76)
+dropdown.BackgroundColor3 = Color3.fromRGB(20,20,20)
+dropdown.Visible = false
 dropdown.ZIndex = 10
+Instance.new("UICorner", dropdown).CornerRadius = UDim.new(0,8)
+
+local scroll = Instance.new("ScrollingFrame", dropdown)
+scroll.Size = UDim2.new(1,-8,1,-8)
+scroll.Position = UDim2.new(0,4,0,4)
+scroll.BackgroundTransparency = 1
+scroll.ScrollBarThickness = 6
+scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 scroll.ZIndex = 11
+local list = Instance.new("UIListLayout", scroll)
+list.Padding = UDim.new(0,4)
+list.SortOrder = Enum.SortOrder.LayoutOrder
 
 local function makeEntry(p)
-	local f=Instance.new("Frame")
-	f.Size=UDim2.new(1,-8,0,36)
-	f.BackgroundColor3=Color3.fromRGB(40,40,40)
-	Instance.new("UICorner",f).CornerRadius=UDim.new(0,6)
-	f.Parent=scroll
-	local n=Instance.new("TextButton",f)
-	n.Size=UDim2.new(1,0,1,0)
-	n.BackgroundTransparency=1
-	n.TextColor3=Color3.new(1,1,1)
-	n.Font=Enum.Font.Gotham n.TextSize=14
-	n.Text=p.DisplayName.." ("..p.Name..")"
-	n.MouseButton1Click:Connect(function()
-		tb.Text=p.Name targetPlayerName=p.Name dropdown.Visible=false
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1,-8,0,32)
+	btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	btn.TextColor3 = Color3.fromRGB(255,255,255)
+	btn.Text = p.DisplayName.." ("..p.Name..")"
+	btn.Font = Enum.Font.Gotham
+	btn.TextSize = 14
+	btn.Parent = scroll
+	btn.ZIndex = 52
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
+	btn.MouseButton1Click:Connect(function()
+		textBox.Text = p.Name
+		targetPlayerName = p.Name
+		dropdown.Visible = false
 	end)
 end
-local function refresh()
-	for _,v in ipairs(scroll:GetChildren()) do
-		if v:IsA("Frame") then v:Destroy() end
-	end
-	for _,p in ipairs(Players:GetPlayers()) do
-		if p~=LocalPlayer then makeEntry(p) end
+
+local function refreshDD()
+	for _,c in ipairs(scroll:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+	for _,pl in ipairs(Players:GetPlayers()) do
+		if pl ~= LP then makeEntry(pl) end
 	end
 end
-ddBtn.MouseButton1Click:Connect(function()
-	dropdown.Visible=not dropdown.Visible
-	if dropdown.Visible then refresh() end
-end)
-Players.PlayerAdded:Connect(function() if dropdown.Visible then refresh() end end)
-Players.PlayerRemoving:Connect(function() if dropdown.Visible then refresh() end end)
 
--- 🔧 Execute Button (no outline + fixed layer)
-local exe = Instance.new("TextButton", frame)
-exe.Size = UDim2.new(1, -16, 0, 40)
-exe.Position = UDim2.new(0, 8, 1, -48)
+ddBtn.MouseButton1Click:Connect(function()
+	dropdown.Visible = not dropdown.Visible
+	if dropdown.Visible then refreshDD() end
+end)
+Players.PlayerAdded:Connect(function() if dropdown.Visible then refreshDD() end end)
+Players.PlayerRemoving:Connect(function() if dropdown.Visible then refreshDD() end end)
+task.delay(1,function() if not dropdown.Visible then refreshDD() end end)
+
+-------------------------------
+-- ▶ Execute Button
+-------------------------------
+local exe = Instance.new("TextButton", F)
+exe.Size = UDim2.new(1,-16,0,40)
+exe.Position = UDim2.new(0,8,1,-48)
 exe.Text = "▶ Execute"
 exe.Font = Enum.Font.GothamBold
 exe.TextSize = 16
 exe.BackgroundColor3 = Color3.fromRGB(100,200,255)
 exe.TextColor3 = Color3.fromRGB(20,20,20)
-exe.TextStrokeTransparency = 1 -- ❌ ปิดขอบดำรอบข้อความ
-exe.ZIndex = 1                -- 🔽 ให้ปุ่มอยู่ใต้ dropdown
+exe.TextStrokeTransparency = 1
+exe.ZIndex = 1
 Instance.new("UICorner", exe).CornerRadius = UDim.new(0,8)
 
-local glow=Instance.new("UIStroke",exe)
-glow.Color=Color3.fromRGB(80,80,80) glow.Thickness=1.8
-local function setGlow(s)
-	local t=TweenService:Create(glow,TweenInfo.new(0.3),
-		s and {Color=Color3.fromRGB(255,140,60),Thickness=3} or {Color=Color3.fromRGB(80,80,80),Thickness=1.8})
-	t:Play()
+local exeStroke = Instance.new("UIStroke", exe)
+exeStroke.Thickness = 1.8
+exeStroke.Color = Color3.fromRGB(80,80,80)
+
+local function setGlow(on)
+	TweenService:Create(exeStroke,TweenInfo.new(0.3), on and
+		{Color=Color3.fromRGB(255,140,60),Thickness=3} or
+		{Color=Color3.fromRGB(80,80,80),Thickness=1.8}
+	):Play()
 end
 
 exe.MouseButton1Click:Connect(function()
-	if active then stopEverything() exe.Text="▶ Execute" exe.BackgroundColor3=Color3.fromRGB(100,200,255) setGlow(false) return end
-	local name=tb.Text and tb.Text:match("%S+") or nil
+	if active then
+		stopWarp()
+		setGlow(false)
+		exe.Text, exe.BackgroundColor3 = "▶ Execute", Color3.fromRGB(100,200,255)
+		return
+	end
+	local name = textBox.Text:match("%S+")
 	if not name then
-		exe.Text="⚠ No Target" exe.BackgroundColor3=Color3.fromRGB(255,70,70)
-		task.wait(1) exe.Text="▶ Execute" exe.BackgroundColor3=Color3.fromRGB(100,200,255) return
+		exe.Text = "⚠ No Target"
+		exe.BackgroundColor3 = Color3.fromRGB(255,70,70)
+		task.wait(1)
+		exe.Text, exe.BackgroundColor3 = "▶ Execute", Color3.fromRGB(100,200,255)
+		return
 	end
-	local t=Players:FindFirstChild(name)
+	local t = Players:FindFirstChild(name)
 	if not (t and t.Character) then
-		exe.Text="❌ Invalid Target" exe.BackgroundColor3=Color3.fromRGB(255,70,70)
-		task.wait(1) exe.Text="▶ Execute" exe.BackgroundColor3=Color3.fromRGB(100,200,255) return
-	end
-	targetPlayerName=name active=true setGlow(true)
-	exe.Text="⏹ Stop" exe.BackgroundColor3=Color3.fromRGB(255,100,100)
-end)
-
--- 🔐 DXD Key Access GUI
-local keyGui=Instance.new("ScreenGui",LocalPlayer.PlayerGui)
-keyGui.Name="KeySystem" keyGui.ZIndexBehavior=Enum.ZIndexBehavior.Global
-local bg=Instance.new("Frame",keyGui)
-bg.Size=UDim2.new(1,0,1,0)
-bg.BackgroundColor3=Color3.new(0,0,0)
-bg.BackgroundTransparency=1
-local kf=Instance.new("Frame",bg)
-kf.Size=UDim2.new(0,280,0,160)
-kf.Position=UDim2.new(0.5,-140,0.5,-80)
-kf.BackgroundColor3=Color3.fromRGB(25,25,25)
-kf.BackgroundTransparency=1
-Instance.new("UICorner",kf).CornerRadius=UDim.new(0,10)
-local bdr=Instance.new("UIStroke",kf)
-bdr.Color=Color3.fromRGB(0,170,255) bdr.Thickness=2
-
-local title2=Instance.new("TextLabel",kf)
-title2.Size=UDim2.new(1,0,0,40)
-title2.BackgroundTransparency=1
-title2.Font=Enum.Font.GothamBold title2.TextSize=20
-title2.Text="DXD Key Access"
-title2.TextColor3=Color3.fromRGB(0,180,255)
-
-local box=Instance.new("TextBox",kf)
-box.Size=UDim2.new(1,-30,0,38)
-box.Position=UDim2.new(0,15,0,60)
-box.PlaceholderText="Enter your key here..."
-box.Font=Enum.Font.Gotham box.TextSize=14 box.ClearTextOnFocus=false
-box.TextColor3=Color3.new(1,1,1)
-box.BackgroundColor3=Color3.fromRGB(40,40,40)
-Instance.new("UICorner",box).CornerRadius=UDim.new(0,6)
-local bs=Instance.new("UIStroke",box)
-bs.Color=Color3.fromRGB(60,60,60) bs.Thickness=1.4
-box.Focused:Connect(function() TweenService:Create(bs,TweenInfo.new(0.25),{Color=Color3.fromRGB(0,200,255),Thickness=2}):Play() end)
-box.FocusLost:Connect(function() TweenService:Create(bs,TweenInfo.new(0.25),{Color=Color3.fromRGB(60,60,60),Thickness=1.4}):Play() end)
-
-local btn=Instance.new("TextButton",kf)
-btn.Size=UDim2.new(1,-30,0,40)
-btn.Position=UDim2.new(0,15,0,108)
-btn.Text="Enter"
-btn.Font=Enum.Font.GothamBold btn.TextSize=16
-btn.TextColor3=Color3.new(1,1,1)
-btn.BackgroundColor3=Color3.fromRGB(0,140,255)
-Instance.new("UICorner",btn).CornerRadius=UDim.new(0,8)
-btn.MouseEnter:Connect(function() TweenService:Create(btn,TweenInfo.new(0.2),{BackgroundColor3=Color3.fromRGB(0,180,255)}):Play() end)
-btn.MouseLeave:Connect(function() TweenService:Create(btn,TweenInfo.new(0.2),{BackgroundColor3=Color3.fromRGB(0,140,255)}):Play() end)
-TweenService:Create(bg,TweenInfo.new(0.6),{BackgroundTransparency=0.4}):Play()
-TweenService:Create(kf,TweenInfo.new(0.6),{BackgroundTransparency=0}):Play()
-
-local function showResult(ok)
-	local txt=Instance.new("TextLabel",kf)
-	txt.Size=UDim2.new(1,0,1,0)
-	txt.BackgroundTransparency=1
-	txt.Font=Enum.Font.GothamBold txt.TextSize=24 txt.TextTransparency=1
-	txt.Text=ok and "ACCESS GRANTED ✅" or "ACCESS DENIED ❌"
-	txt.TextColor3=ok and Color3.fromRGB(0,200,255) or Color3.fromRGB(255,70,70)
-	TweenService:Create(txt,TweenInfo.new(0.3),{TextTransparency=0}):Play()
-	if ok then
-		for i=1,2 do
-			TweenService:Create(bdr,TweenInfo.new(0.3),{Color=Color3.fromRGB(0,255,255)}):Play() task.wait(0.3)
-			TweenService:Create(bdr,TweenInfo.new(0.3),{Color=Color3.fromRGB(0,180,255)}):Play() task.wait(0.3)
-		end
-		task.wait(0.5)
-		TweenService:Create(txt,TweenInfo.new(0.4),{TextTransparency=1}):Play()
-	else
-		for i=1,3 do
-			TweenService:Create(kf,TweenInfo.new(0.05),{Position=UDim2.new(0.5,-145,0.5,-80)}):Play() task.wait(0.05)
-			TweenService:Create(kf,TweenInfo.new(0.05),{Position=UDim2.new(0.5,-135,0.5,-80)}):Play() task.wait(0.05)
-		end
-		TweenService:Create(kf,TweenInfo.new(0.3),{Position=UDim2.new(0.5,-140,0.5,-80)}):Play()
+		exe.Text = "❌ Invalid Target"
+		exe.BackgroundColor3 = Color3.fromRGB(255,70,70)
 		task.wait(1)
-		TweenService:Create(txt,TweenInfo.new(0.4),{TextTransparency=1}):Play()
+		exe.Text, exe.BackgroundColor3 = "▶ Execute", Color3.fromRGB(100,200,255)
+		return
 	end
-end
-
-btn.MouseButton1Click:Connect(function()
-	if tostring(box.Text) == keyCode then
-		saveKey()
-		showResult(true)
-
-		-- ปลดล็อค UI หลัก
-		task.wait(1)
-
-		-- fade ออก
-		TweenService:Create(bg, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
-		TweenService:Create(kf, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
-		task.wait(0.55)
-
-		pcall(function() keyGui:Destroy() end)
-		sg.Enabled = true
-	else
-		showResult(false)
-	end
+	targetPlayerName = name
+	active = true
+	exe.Text = "⏹ Stop"
+	exe.BackgroundColor3 = Color3.fromRGB(255,100,100)
+	setGlow(true)
 end)
 
--- auto-skip key screen ถ้ามี key วันนี้แล้ว
-if hasValidKey() then
-	sg.Enabled = true
-	pcall(function() keyGui:Destroy() end)
-else
-	sg.Enabled = false
-end
-
--- mini toggle (หลัง key ผ่านไปแล้วก็ใช้ได้)
-local miniToggle = Instance.new("TextButton", sg)
-miniToggle.Size = UDim2.new(0, 40, 0, 40)
-miniToggle.Position = UDim2.new(0, 20, 0.5, -20)
-miniToggle.BackgroundColor3 = Color3.fromRGB(80,80,80)
-miniToggle.Text = "💩"
-miniToggle.TextColor3 = Color3.fromRGB(255,255,255)
-miniToggle.BorderSizePixel = 0
-miniToggle.AutoButtonColor = true
-Instance.new("UICorner", miniToggle).CornerRadius = UDim.new(0,10)
-miniToggle.Active = true
-miniToggle.Draggable = true
-
--- เริ่มต้นซ่อนกรอบหลัก ให้เหลือแต่ปุ่มกลมๆ
-frame.Visible = false
-miniToggle.MouseButton1Click:Connect(function()
-	frame.Visible = not frame.Visible
-	miniToggle.Text = frame.Visible and "❌" or "💩"
-end)
-
--- safety cleanup on teleport
-LocalPlayer.OnTeleport:Connect(function()
-	pcall(function()
-		if sg then sg:Destroy() end
-		if keyGui then keyGui:Destroy() end
+-------------------------------
+-- 🔑 Simple Key UI
+-------------------------------
+if not hasValidKey() then
+	local keyGui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
+	keyGui.Name = "KeySystem"
+	keyGui.ResetOnSpawn = false
+	local frame = Instance.new("Frame", keyGui)
+	frame.Size = UDim2.new(0,280,0,150)
+	frame.Position = UDim2.new(0.5,-140,0.5,-75)
+	frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+	Instance.new("UICorner", frame).CornerRadius = UDim.new(0,8)
+	local title = Instance.new("TextLabel", frame)
+	title.Size = UDim2.new(1,0,0,30)
+	title.Text = "Enter Key"
+    textBox.Text = ""
+	title.Font = Enum.Font.GothamBold
+	title.TextColor3 = Color3.fromRGB(0,180,255)
+	title.BackgroundTransparency = 1
+	local box = Instance.new("TextBox", frame)
+	box.Size = UDim2.new(1,-30,0,36)
+	box.Position = UDim2.new(0,15,0,40)
+	box.PlaceholderText = "Enter your key here..."
+	box.Font = Enum.Font.Gotham
+	box.TextColor3 = Color3.fromRGB(255,255,255)
+	box.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	Instance.new("UICorner", box).CornerRadius = UDim.new(0,6)
+	local btn = Instance.new("TextButton", frame)
+	btn.Size = UDim2.new(1,-30,0,36)
+	btn.Position = UDim2.new(0,15,0,90)
+	btn.Text = "Confirm"
+	btn.Font = Enum.Font.GothamBold
+	btn.TextColor3 = Color3.fromRGB(255,255,255)
+	btn.BackgroundColor3 = Color3.fromRGB(0,140,255)
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
+	btn.MouseButton1Click:Connect(function()
+		if box.Text == keyCode then
+			saveKey()
+			keyGui:Destroy()
+			SG.Enabled = true
+		else
+			btn.Text, btn.BackgroundColor3 = "Invalid Key!", Color3.fromRGB(255,70,70)
+			task.wait(1)
+			btn.Text, btn.BackgroundColor3 = "Confirm", Color3.fromRGB(0,140,255)
+		end
 	end)
-end)
+else
+	SG.Enabled = true
+end
 
-print("✅ DXD WarpControl loaded. stay toxic 🔥")
+print("✅ DXD WarpControl (Classic Key Edition) Ready.")
