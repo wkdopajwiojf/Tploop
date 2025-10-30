@@ -224,6 +224,49 @@ ddBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
 ddBtn.TextColor3 = Color3.fromRGB(255,255,255)
 Instance.new("UICorner", ddBtn).CornerRadius = UDim.new(0,6)
 
+-- 🌟 เอฟเฟกต์ Glow ตอน hover / เปิด dropdown
+local ddStroke = Instance.new("UIStroke")
+ddStroke.Thickness = 1.8
+ddStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+ddStroke.Color = Color3.fromRGB(80,80,80)
+ddStroke.Parent = ddBtn
+
+-- hover effect
+ddBtn.MouseEnter:Connect(function()
+	game:GetService("TweenService"):Create(
+		ddStroke,
+		TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+		{Color = Color3.fromRGB(100,200,255), Thickness = 2.5}
+	):Play()
+end)
+
+ddBtn.MouseLeave:Connect(function()
+	game:GetService("TweenService"):Create(
+		ddStroke,
+		TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+		{Color = Color3.fromRGB(80,80,80), Thickness = 1.8}
+	):Play()
+end)
+
+-- เมื่อเปิด dropdown ให้เรืองแสงค้างไว้
+ddBtn.MouseButton1Click:Connect(function()
+	dropdown.Visible = not dropdown.Visible
+	if dropdown.Visible then
+		refreshDD()
+		game:GetService("TweenService"):Create(
+			ddStroke,
+			TweenInfo.new(0.25),
+			{Color = Color3.fromRGB(0,180,255), Thickness = 2.8}
+		):Play()
+	else
+		game:GetService("TweenService"):Create(
+			ddStroke,
+			TweenInfo.new(0.25),
+			{Color = Color3.fromRGB(80,80,80), Thickness = 1.8}
+		):Play()
+	end
+end)
+
 -------------------------------
 -- 👥 Dropdown list (with avatar & glow)
 -------------------------------
