@@ -291,7 +291,7 @@ copyLinkButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 copyLinkButton.BorderSizePixel = 0
 
 copyLinkButton.MouseButton1Click:Connect(function()
-    local keyURL = "https://your-link.com/getkey" -- 🔁 เปลี่ยนเป็นลิงก์ขอคีย์จริงของคุณ
+    local keyURL = "Are you stupid?" -- 🔁 เปลี่ยนเป็นลิงก์ขอคีย์จริงของคุณ
     if setclipboard then
         setclipboard(keyURL)
         copyLinkButton.Text = "Copied!"
