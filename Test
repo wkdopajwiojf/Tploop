@@ -176,6 +176,37 @@ F.BackgroundColor3 = Color3.fromRGB(30,30,30)
 F.Active, F.Draggable = true, true
 Instance.new("UICorner", F).CornerRadius = UDim.new(0,8)
 
+---------------------------------
+-- 🧲 Smooth Drag (Ray UI Style)
+---------------------------------
+local UIS = game:GetService("UserInputService")
+local TS = game:GetService("TweenService")
+
+local dragging, dragStart, startPos
+
+local function updateDrag(input)
+	if not dragging then return end
+	local delta = input.Position - dragStart
+	local goal = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	TS:Create(F, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = goal}):Play()
+end
+
+F.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = F.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+F.InputChanged:Connect(updateDrag)
+UIS.InputChanged:Connect(updateDrag)
+
 local T = Instance.new("TextLabel", F)
 T.Size = UDim2.new(1,0,0,28)
 T.Position = UDim2.new(0,0,0,6)
