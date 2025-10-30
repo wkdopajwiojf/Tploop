@@ -291,6 +291,24 @@ exe.TextStrokeTransparency = 1
 exe.ZIndex = 1
 Instance.new("UICorner", exe).CornerRadius = UDim.new(0,8)
 
+-- 🌟 เอฟเฟกต์แสงตอนเริ่มวาร์ป (Execute Glow)
+local exeStroke = Instance.new("UIStroke", exe)
+exeStroke.Thickness = 1.8
+exeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+exeStroke.Color = Color3.fromRGB(80,80,80) -- ปกติยังไม่เรือง
+
+local function setExecuteGlow(state)
+	local tween = game:GetService("TweenService"):Create(
+		exeStroke,
+		TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+		state and
+			{ Color = Color3.fromRGB(255,140,60), Thickness = 3 } -- ตอนทำงาน: ส้มเรืองแสง
+			or
+			{ Color = Color3.fromRGB(80,80,80), Thickness = 1.8 }  -- ปกติ: มืดๆ
+	)
+	tween:Play()
+end
+
 local exeStroke = Instance.new("UIStroke", exe)
 exeStroke.Thickness = 1.8
 exeStroke.Color = Color3.fromRGB(80,80,80)
@@ -305,31 +323,37 @@ end
 exe.MouseButton1Click:Connect(function()
 	if active then
 		stopWarp()
-		setGlow(false)
-		exe.Text, exe.BackgroundColor3 = "▶ Execute", Color3.fromRGB(100,200,255)
+		setExecuteGlow(false)
+		exe.Text = "▶ Execute"
+		exe.BackgroundColor3 = Color3.fromRGB(100,200,255)
 		return
 	end
+
 	local name = textBox.Text:match("%S+")
 	if not name then
 		exe.Text = "⚠ No Target"
 		exe.BackgroundColor3 = Color3.fromRGB(255,70,70)
 		task.wait(1)
-		exe.Text, exe.BackgroundColor3 = "▶ Execute", Color3.fromRGB(100,200,255)
+		exe.Text = "▶ Execute"
+		exe.BackgroundColor3 = Color3.fromRGB(100,200,255)
 		return
 	end
+
 	local t = Players:FindFirstChild(name)
 	if not (t and t.Character) then
 		exe.Text = "❌ Invalid Target"
 		exe.BackgroundColor3 = Color3.fromRGB(255,70,70)
 		task.wait(1)
-		exe.Text, exe.BackgroundColor3 = "▶ Execute", Color3.fromRGB(100,200,255)
+		exe.Text = "▶ Execute"
+		exe.BackgroundColor3 = Color3.fromRGB(100,200,255)
 		return
 	end
+
 	targetPlayerName = name
 	active = true
+	setExecuteGlow(true) -- ✅ เปิดแสง
 	exe.Text = "⏹ Stop"
 	exe.BackgroundColor3 = Color3.fromRGB(255,100,100)
-	setGlow(true)
 end)
 
 -------------------------------
