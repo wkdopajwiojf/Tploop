@@ -256,7 +256,7 @@ ddBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
 ddBtn.TextColor3 = Color3.fromRGB(255,255,255)
 Instance.new("UICorner", ddBtn).CornerRadius = UDim.new(0,6)
 
--- 👇 dropdown ต้องอยู่สร้างก่อน
+-- 👇 dropdown ต้องถูกสร้างก่อน
 local dropdown = Instance.new("Frame", F)
 dropdown.Size = UDim2.new(1,-16,0,140)
 dropdown.Position = UDim2.new(0,8,0,76)
@@ -264,64 +264,90 @@ dropdown.BackgroundColor3 = Color3.fromRGB(20,20,20)
 dropdown.Visible = false
 Instance.new("UICorner", dropdown).CornerRadius = UDim.new(0,8)
 
--- 👇 แล้วค่อยวาง effect ของ ddBtn ตรงนี้หลังจาก dropdown ถูกสร้างแล้ว
+-- สร้าง ScrollFrame สำหรับรายชื่อผู้เล่น
+local scroll = Instance.new("ScrollingFrame", dropdown)
+scroll.Size = UDim2.new(1,-8,1,-8)
+scroll.Position = UDim2.new(0,4,0,4)
+scroll.BackgroundTransparency = 1
+scroll.ScrollBarThickness = 6
+scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+local list = Instance.new("UIListLayout", scroll)
+list.Padding = UDim.new(0,4)
+list.SortOrder = Enum.SortOrder.LayoutOrder
+
+---------------------------------
+-- 🎞 Dropdown Animation FX
+---------------------------------
+local function animateDropdownOpen()
+	dropdown.Visible = true
+	dropdown.ClipsDescendants = true
+	dropdown.Size = UDim2.new(0, 0, 0, 140)
+	dropdown.BackgroundTransparency = 1
+
+	-- เอฟเฟกต์ปูพรมจากขวาไปซ้าย
+	local tween1 = TweenService:Create(dropdown, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = UDim2.new(1, -16, 0, 140),
+		BackgroundTransparency = 0
+	})
+	tween1:Play()
+
+	-- fade-in รายชื่อผู้เล่นทีละตัว
+	task.spawn(function()
+		for _, child in ipairs(scroll:GetChildren()) do
+			if child:IsA("TextButton") then
+				child.TextTransparency = 1
+				TweenService:Create(child, TweenInfo.new(0.25, Enum.EasingStyle.Sine), {TextTransparency = 0}):Play()
+				task.wait(0.05)
+			end
+		end
+	end)
+end
+
+local function animateDropdownClose()
+	local tween = TweenService:Create(dropdown, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+		Size = UDim2.new(0, 0, 0, 140),
+		BackgroundTransparency = 1
+	})
+	tween:Play()
+	tween.Completed:Wait()
+	dropdown.Visible = false
+end
+
+---------------------------------
+-- ✨ ปุ่ม Dropdown + Glow Effect
+---------------------------------
 local ddStroke = Instance.new("UIStroke", ddBtn)
 ddStroke.Thickness = 1.8
 ddStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 ddStroke.Color = Color3.fromRGB(80,80,80)
 
--- hover + glow logic
+-- hover effect
 ddBtn.MouseEnter:Connect(function()
-	game:GetService("TweenService"):Create(ddStroke, TweenInfo.new(0.25),
+	TweenService:Create(ddStroke, TweenInfo.new(0.25),
 		{Color = Color3.fromRGB(100,200,255), Thickness = 2.5}
 	):Play()
 end)
 ddBtn.MouseLeave:Connect(function()
-	game:GetService("TweenService"):Create(ddStroke, TweenInfo.new(0.25),
+	TweenService:Create(ddStroke, TweenInfo.new(0.25),
 		{Color = Color3.fromRGB(80,80,80), Thickness = 1.8}
 	):Play()
 end)
+
+-- toggle dropdown + glow ฟ้า
 ddBtn.MouseButton1Click:Connect(function()
-	dropdown.Visible = not dropdown.Visible
 	if dropdown.Visible then
-		refreshDD()
-		game:GetService("TweenService"):Create(ddStroke, TweenInfo.new(0.25),
-			{Color = Color3.fromRGB(0,180,255), Thickness = 2.8}
+		animateDropdownClose()
+		TweenService:Create(ddStroke, TweenInfo.new(0.25),
+			{Color = Color3.fromRGB(80,80,80), Thickness = 1.8}
 		):Play()
 	else
-		game:GetService("TweenService"):Create(ddStroke, TweenInfo.new(0.25),
-			{Color = Color3.fromRGB(80,80,80), Thickness = 1.8}
+		refreshDD()
+		animateDropdownOpen()
+		TweenService:Create(ddStroke, TweenInfo.new(0.25),
+			{Color = Color3.fromRGB(0,180,255), Thickness = 2.8}
 		):Play()
 	end
 end)
-
--------------------------------
--- 👥 Dropdown list (with avatar & glow)
--------------------------------
-local dropdown = Instance.new("Frame")
-dropdown.Size = UDim2.new(1,-16,0,140)
-dropdown.Position = UDim2.new(0,8,0,76)
-dropdown.BackgroundColor3 = Color3.fromRGB(20,20,20)
-dropdown.BorderSizePixel = 0
-dropdown.Visible = false
-dropdown.ZIndex = 100
-dropdown.Parent = F
-Instance.new("UICorner", dropdown).CornerRadius = UDim.new(0,8)
-
--- 🌟 Glow รอบ dropdown
-local ddGlow = Instance.new("UIStroke")
-ddGlow.Thickness = 2.5
-ddGlow.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-ddGlow.Color = Color3.fromRGB(0,180,255)
-ddGlow.Transparency = 1
-ddGlow.Parent = dropdown
-
--- 🌀 ฟังก์ชันเปิด/ปิด glow
-local function setDropdownGlow(state)
-	TweenService:Create(ddGlow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-		state and {Transparency = 0.2} or {Transparency = 1}
-	):Play()
-end
 
 local scroll = Instance.new("ScrollingFrame")
 scroll.Size = UDim2.new(1,-8,1,-8)
