@@ -1,1 +1,616 @@
 
+--[[
+🚀 DXD WarpControl (Classic Key Edition)
+
+ใช้ Key GUI แบบเรียบง่าย (no animation)
+
+DXD Warp UI ล่าสุดพร้อม Dropdown / Execute Glow / Error Color
+
+พร้อมรัน 100%
+]]
+
+-- ⚙️ Warp Distance Config
+local WARP_DISTANCE_MIN = 8   -- ระยะต่ำสุด (หน่วย stud)
+local WARP_DISTANCE_MAX = 8   -- ระยะสูงสุด (หน่วย stud)
+
+---
+
+-- 🔐 Key Config
+
+local keyCode = "222554"
+local keyFileName = "warp_key_cache.txt"
+
+local canUseFile = (type(isfile) == "function") and (type(readfile) == "function") and (type(writefile) == "function")
+local function getTodayString()
+local d = os.date("*t")
+return string.format("%04d-%02d-%02d", d.year, d.month, d.day)
+end
+local function hasValidKey()
+if not canUseFile then return false end
+if not isfile(keyFileName) then return false end
+local ok, content = pcall(readfile, keyFileName)
+if not ok or not content then return false end
+local parts = string.split(content, "|")
+return parts[1] == keyCode and parts[2] == getTodayString()
+end
+local function saveKey()
+if canUseFile then
+pcall(writefile, keyFileName, keyCode.."|"..getTodayString())
+end
+end
+
+
+---
+
+-- 💥 Cleanup Old UIs
+
+pcall(function()
+for _, name in ipairs({"WarpControlGui", "KeySystem"}) do
+local g = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui"):FindFirstChild(name)
+if g then g:Destroy() end
+end
+end)
+
+
+---
+
+-- 🧠 Services & State
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UIS = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
+local Cam = workspace.CurrentCamera
+
+local active = false
+local targetPlayerName = nil
+
+
+---
+
+-- ⚙️ Helper Functions
+
+local function getRandomBehindPosition(targetHRP)
+local back = -targetHRP.CFrame.LookVector
+local angle = math.rad(math.random(-90, 90))
+local rotated = CFrame.fromAxisAngle(Vector3.new(0,1,0), angle):VectorToWorldSpace(back)
+local dist = math.random(WARP_DISTANCE_MIN, WARP_DISTANCE_MAX)
+return targetHRP.Position + rotated * dist
+end
+
+local function lookAtTarget(localChar, targetChar)
+local root = localChar:FindFirstChild("HumanoidRootPart")
+local tRoot = targetChar:FindFirstChild("HumanoidRootPart")
+if root and tRoot then
+root.CFrame = CFrame.new(root.Position, Vector3.new(tRoot.Position.X, root.Position.Y, tRoot.Position.Z))
+end
+end
+
+local function highlightTarget(plr)
+if not (plr and plr.Character) then return end
+if not plr.Character:FindFirstChild("Target_Highlight") then
+local h = Instance.new("Highlight")
+h.Name = "Target_Highlight"
+h.FillColor = Color3.fromRGB(255, 0, 0)
+h.FillTransparency = 0.8
+h.OutlineColor = Color3.fromRGB(0, 0, 0)
+h.Adornee = plr.Character
+h.Parent = plr.Character
+end
+end
+
+local function clearHighlights()
+for _, p in ipairs(Players:GetPlayers()) do
+if p.Character then
+local h = p.Character:FindFirstChild("Target_Highlight")
+if h then h:Destroy() end
+end
+end
+end
+
+local function stopWarp()
+active = false
+targetPlayerName = nil
+clearHighlights()
+pcall(function()
+Cam.CameraType = Enum.CameraType.Custom
+local hum = LP.Character and LP.Character:FindFirstChildWhichIsA("Humanoid")
+local head = LP.Character and LP.Character:FindFirstChild("Head")
+Cam.CameraSubject = head or hum or LP.Character
+end)
+end
+
+
+---
+
+-- 🎥 Camera Orbit Controls
+
+local camRot = Vector2.new(0, 0)
+local camDist = 6
+local lastTouch = nil
+local rotSpeed, zoomSpeed = 0.2, 0.8
+
+UIS.InputChanged:Connect(function(input, processed)
+if processed then return end
+if input.UserInputType == Enum.UserInputType.MouseMovement and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+camRot -= Vector2.new(input.Delta.x, input.Delta.y) * rotSpeed
+elseif input.UserInputType == Enum.UserInputType.Touch then
+if lastTouch then
+local delta = input.Position - lastTouch
+camRot -= Vector2.new(delta.X, delta.Y) * (rotSpeed * 0.6)
+end
+lastTouch = input.Position
+end
+if input.UserInputType == Enum.UserInputType.MouseWheel then
+camDist = math.clamp(camDist - input.Position.Z * 2, 2, 25)
+end
+end)
+UIS.TouchPinch:Connect(function(_, scale)
+camDist = math.clamp(camDist / scale, 2, 25)
+end)
+UIS.TouchEnded:Connect(function() lastTouch = nil end)
+
+
+---
+
+-- 🌀 Warp Loop
+
+RunService.Heartbeat:Connect(function()
+if not active or not targetPlayerName then return end
+local tp = Players:FindFirstChild(targetPlayerName)
+if not (tp and tp.Character and LP.Character) then return end
+
+highlightTarget(tp)  
+local th = tp.Character:FindFirstChild("HumanoidRootPart")  
+local lh = LP.Character:FindFirstChild("HumanoidRootPart")  
+local head = tp.Character:FindFirstChild("Head")  
+if th and lh then  
+	pcall(function() lh.CFrame = CFrame.new(getRandomBehindPosition(th)) end)  
+	lookAtTarget(LP.Character, tp.Character)  
+end  
+
+if head then  
+	Cam.CameraType = Enum.CameraType.Scriptable  
+	local headPos = head.Position + Vector3.new(0,1.5,0)  
+	local rotX = CFrame.Angles(0, math.rad(camRot.X), 0)  
+	local rotY = CFrame.Angles(math.rad(camRot.Y), 0, 0)  
+	local offset = rotX * rotY * Vector3.new(0, 0, camDist)  
+	Cam.CFrame = CFrame.new(headPos + offset, headPos)  
+end
+
+end)
+
+
+---
+
+-- 🧱 Build GUI
+
+local SG = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
+SG.Name = "WarpControlGui"
+SG.ResetOnSpawn = false
+SG.Enabled = false
+
+local F = Instance.new("Frame", SG)
+F.Size = UDim2.new(0,300,0,140)
+F.Position = UDim2.new(0.3,0,0.3,0)
+F.BackgroundColor3 = Color3.fromRGB(30,30,30)
+F.Active, F.Draggable = true, true
+Instance.new("UICorner", F).CornerRadius = UDim.new(0,8)
+
+
+---
+
+-- 🧲 Smooth Drag (Ray UI Style)
+
+local UIS = game:GetService("UserInputService")
+local TS = game:GetService("TweenService")
+
+local dragging, dragStart, startPos
+
+local function updateDrag(input)
+if not dragging then return end
+local delta = input.Position - dragStart
+local goal = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+TS:Create(F, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = goal}):Play()
+end
+
+F.InputBegan:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+dragging = true
+dragStart = input.Position
+startPos = F.Position
+input.Changed:Connect(function()
+if input.UserInputState == Enum.UserInputState.End then
+dragging = false
+end
+end)
+end
+end)
+
+F.InputChanged:Connect(updateDrag)
+UIS.InputChanged:Connect(updateDrag)
+
+local T = Instance.new("TextLabel", F)
+T.Size = UDim2.new(1,0,0,28)
+T.Position = UDim2.new(0,0,0,6)
+T.BackgroundTransparency = 1
+T.Font = Enum.Font.GothamBold
+T.TextSize = 18
+T.TextColor3 = Color3.fromRGB(255,150,80)
+T.Text = "WarpControl (DXD)"
+
+local inputFrame = Instance.new("Frame", F)
+inputFrame.Size = UDim2.new(1,-16,0,36)
+inputFrame.Position = UDim2.new(0,8,0,36)
+inputFrame.BackgroundTransparency = 1
+
+local textBox = Instance.new("TextBox", inputFrame)
+textBox.Size = UDim2.new(1,-90,1,0)
+textBox.PlaceholderText = "Type username or pick from dropdown"
+textBox.BackgroundColor3 = Color3.fromRGB(45,45,45)
+textBox.TextColor3 = Color3.fromRGB(255,255,255)
+textBox.TextXAlignment = Enum.TextXAlignment.Center
+textBox.TextYAlignment = Enum.TextYAlignment.Center
+textBox.ClearTextOnFocus = false
+textBox.Font = Enum.Font.Gotham
+textBox.TextSize = 10
+textBox.Text = ""
+Instance.new("UICorner", textBox).CornerRadius = UDim.new(0,6)
+
+local uiStroke = Instance.new("UIStroke", textBox)
+uiStroke.Thickness, uiStroke.ApplyStrokeMode = 1.6, Enum.ApplyStrokeMode.Border
+uiStroke.Color = Color3.fromRGB(60,60,60)
+
+textBox.Focused:Connect(function()
+TweenService:Create(uiStroke,TweenInfo.new(0.2),{Color=Color3.fromRGB(100,200,255),Thickness=2.5}):Play()
+end)
+textBox.FocusLost:Connect(function()
+TweenService:Create(uiStroke,TweenInfo.new(0.2),{Color=Color3.fromRGB(60,60,60),Thickness=1.6}):Play()
+end)
+
+-- 👇 ปุ่ม ddBtn อยู่ตรงนี้
+local ddBtn = Instance.new("TextButton", inputFrame)
+ddBtn.Size = UDim2.new(0,80,1,0)
+ddBtn.Position = UDim2.new(1,-80,0,0)
+ddBtn.Text = "▼ Players"
+ddBtn.Font = Enum.Font.GothamBold
+ddBtn.TextSize = 14
+ddBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+ddBtn.TextColor3 = Color3.fromRGB(255,255,255)
+Instance.new("UICorner", ddBtn).CornerRadius = UDim.new(0,6)
+
+-- 👇 dropdown (Fixed inside main Frame)
+local dropdown = Instance.new("Frame")
+dropdown.Name = "DropdownFrame"
+dropdown.Size = UDim2.new(1, -16, 0, 0)
+dropdown.Position = UDim2.new(0, 8, 0, 76)
+dropdown.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+dropdown.Visible = false
+dropdown.ClipsDescendants = true
+dropdown.ZIndex = 50
+dropdown.Parent = F
+Instance.new("UICorner", dropdown).CornerRadius = UDim.new(0, 8)
+
+local scroll = Instance.new("ScrollingFrame", dropdown)
+scroll.Size = UDim2.new(1, -8, 1, -8)
+scroll.Position = UDim2.new(0, 4, 0, 4)
+scroll.BackgroundTransparency = 1
+scroll.ScrollBarThickness = 6
+scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scroll.ZIndex = 51
+local list = Instance.new("UIListLayout", scroll)
+list.Padding = UDim.new(0, 4)
+list.SortOrder = Enum.SortOrder.LayoutOrder
+
+---------------------------------
+-- 🎞 Dropdown Animation (Fixed)
+---------------------------------
+local function animateDropdownOpen()
+	dropdown.Visible = true
+	dropdown.Size = UDim2.new(1, -16, 0, 0)
+	dropdown.ClipsDescendants = true
+
+	local tween = TweenService:Create(dropdown, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = UDim2.new(1, -16, 0, 140),
+	})
+	tween:Play()
+
+	task.spawn(function()
+		for _, child in ipairs(scroll:GetChildren()) do
+			if child:IsA("TextButton") then
+				child.TextTransparency = 1
+				TweenService:Create(child, TweenInfo.new(0.25, Enum.EasingStyle.Sine), {TextTransparency = 0}):Play()
+				task.wait(0.05)
+			end
+		end
+	end)
+end
+
+local function animateDropdownClose()
+	local tween = TweenService:Create(dropdown, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+		Size = UDim2.new(1, -16, 0, 0),
+	})
+	tween:Play()
+	tween.Completed:Wait()
+	dropdown.Visible = false
+end
+
+local function refreshDD()
+	for _,c in ipairs(scroll:GetChildren()) do
+		if c:IsA("Frame") then c:Destroy() end
+	end
+	for _,pl in ipairs(Players:GetPlayers()) do
+		if pl ~= LP then
+			makeEntry(pl)
+		end
+	end
+end
+
+-- 👤 ช่องผู้เล่นใน dropdown (สร้างช่องแต่ละคน)
+local function makeEntry(p)
+	local btn = Instance.new("Frame")
+	btn.Size = UDim2.new(1, -8, 0, 40)
+	btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	btn.ZIndex = 102
+	btn.Parent = scroll
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+	-- รูปโปรไฟล์ผู้เล่น
+	local avatar = Instance.new("ImageLabel", btn)
+	avatar.Size = UDim2.new(0, 32, 0, 32)
+	avatar.Position = UDim2.new(0, 4, 0.5, -16)
+	avatar.BackgroundTransparency = 1
+	avatar.ZIndex = 103
+
+	task.spawn(function()
+		local ok, thumb = pcall(function()
+			return Players:GetUserThumbnailAsync(p.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
+		end)
+		if ok and thumb then
+			avatar.Image = thumb
+		end
+	end)
+
+	-- ชื่อผู้เล่น
+	local nameBtn = Instance.new("TextButton", btn)
+	nameBtn.Size = UDim2.new(1, -44, 1, 0)
+	nameBtn.Position = UDim2.new(0, 40, 0, 0)
+	nameBtn.BackgroundTransparency = 1
+	nameBtn.Text = p.DisplayName .. " (" .. p.Name .. ")"
+	nameBtn.Font = Enum.Font.Gotham
+	nameBtn.TextSize = 14
+	nameBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	nameBtn.TextXAlignment = Enum.TextXAlignment.Left
+	nameBtn.ZIndex = 104
+
+	-- เมื่อกดเลือกชื่อ
+	nameBtn.MouseButton1Click:Connect(function()
+		textBox.Text = p.Name
+		targetPlayerName = p.Name
+		dropdown.Visible = false
+		setDropdownGlow(false) -- ปิด glow เมื่อเลือกเสร็จ
+	end)
+end
+
+
+-- 🔁 โหลดรายชื่อผู้เล่นใน dropdown ใหม่ทั้งหมด
+local function refreshDD()
+	-- ล้างของเก่าออกก่อน
+	for _, c in ipairs(scroll:GetChildren()) do
+		if c:IsA("Frame") then
+			c:Destroy()
+		end
+	end
+
+	-- เพิ่มรายชื่อใหม่
+	for _, pl in ipairs(Players:GetPlayers()) do
+		if pl ~= LP then
+			makeEntry(pl)
+		end
+	end
+end
+
+-- ✨ ปุ่ม Dropdown + Glow Effect
+
+local ddStroke = Instance.new("UIStroke", ddBtn)
+ddStroke.Thickness = 1.8
+ddStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+ddStroke.Color = Color3.fromRGB(80,80,80)
+
+-- hover effect
+ddBtn.MouseEnter:Connect(function()
+TweenService:Create(ddStroke, TweenInfo.new(0.25),
+{Color = Color3.fromRGB(100,200,255), Thickness = 2.5}
+):Play()
+end)
+ddBtn.MouseLeave:Connect(function()
+TweenService:Create(ddStroke, TweenInfo.new(0.25),
+{Color = Color3.fromRGB(80,80,80), Thickness = 1.8}
+):Play()
+end)
+
+local function setDropdownGlow(on)
+	if on then
+		TweenService:Create(ddStroke, TweenInfo.new(0.3), {
+			Color = Color3.fromRGB(0,180,255),
+			Thickness = 2.8
+		}):Play()
+	else
+		TweenService:Create(ddStroke, TweenInfo.new(0.3), {
+			Color = Color3.fromRGB(80,80,80),
+			Thickness = 1.8
+		}):Play()
+	end
+end
+
+-- toggle dropdown + glow ฟ้า
+ddBtn.MouseButton1Click:Connect(function()
+if dropdown.Visible then
+animateDropdownClose()
+TweenService:Create(ddStroke, TweenInfo.new(0.25),
+{Color = Color3.fromRGB(80,80,80), Thickness = 1.8}
+):Play()
+else
+refreshDD()
+animateDropdownOpen()
+TweenService:Create(ddStroke, TweenInfo.new(0.25),
+{Color = Color3.fromRGB(0,180,255), Thickness = 2.8}
+):Play()
+end
+end)
+
+local list = Instance.new("UIListLayout")
+list.Padding = UDim.new(0,4)
+list.SortOrder = Enum.SortOrder.LayoutOrder
+list.Parent = scroll
+
+Players.PlayerAdded:Connect(function()
+if dropdown.Visible then refreshDD() end
+end)
+Players.PlayerRemoving:Connect(function()
+if dropdown.Visible then refreshDD() end
+end)
+
+task.delay(1,function()
+if not dropdown.Visible then
+refreshDD()
+end
+end)
+
+
+---
+
+-- ▶ Execute Button
+
+local exe = Instance.new("TextButton", F)
+exe.Size = UDim2.new(1,-16,0,40)
+exe.Position = UDim2.new(0,8,1,-48)
+exe.Text = "▶ Execute"
+exe.Font = Enum.Font.GothamBold
+exe.TextSize = 16
+exe.BackgroundColor3 = Color3.fromRGB(100,200,255)
+exe.TextColor3 = Color3.fromRGB(20,20,20)
+exe.TextStrokeTransparency = 1
+exe.ZIndex = 1
+Instance.new("UICorner", exe).CornerRadius = UDim.new(0,8)
+
+-- 🌟 เอฟเฟกต์แสงตอนเริ่มวาร์ป (Execute Glow)
+local exeStroke = Instance.new("UIStroke", exe)
+exeStroke.Thickness = 1.8
+exeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+exeStroke.Color = Color3.fromRGB(80,80,80) -- ปกติยังไม่เรือง
+
+local function setExecuteGlow(state)
+local tween = game:GetService("TweenService"):Create(
+exeStroke,
+TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+state and
+{ Color = Color3.fromRGB(255,140,60), Thickness = 3 } -- ตอนทำงาน: ส้มเรืองแสง
+or
+{ Color = Color3.fromRGB(80,80,80), Thickness = 1.8 }  -- ปกติ: มืดๆ
+)
+tween:Play()
+end
+
+local exeStroke = Instance.new("UIStroke", exe)
+exeStroke.Thickness = 1.8
+exeStroke.Color = Color3.fromRGB(80,80,80)
+
+local function setGlow(on)
+TweenService:Create(exeStroke,TweenInfo.new(0.3), on and
+{Color=Color3.fromRGB(255,140,60),Thickness=3} or
+{Color=Color3.fromRGB(80,80,80),Thickness=1.8}
+):Play()
+end
+
+exe.MouseButton1Click:Connect(function()
+if active then
+stopWarp()
+setExecuteGlow(false)
+exe.Text = "▶ Execute"
+exe.BackgroundColor3 = Color3.fromRGB(100,200,255)
+return
+end
+
+local name = textBox.Text:match("%S+")  
+if not name then  
+	exe.Text = "⚠ No Target"  
+	exe.BackgroundColor3 = Color3.fromRGB(255,70,70)  
+	task.wait(1)  
+	exe.Text = "▶ Execute"  
+	exe.BackgroundColor3 = Color3.fromRGB(100,200,255)  
+	return  
+end  
+
+local t = Players:FindFirstChild(name)  
+if not (t and t.Character) then  
+	exe.Text = "❌ Invalid Target"  
+	exe.BackgroundColor3 = Color3.fromRGB(255,70,70)  
+	task.wait(1)  
+	exe.Text = "▶ Execute"  
+	exe.BackgroundColor3 = Color3.fromRGB(100,200,255)  
+	return  
+end  
+
+targetPlayerName = name  
+active = true  
+setExecuteGlow(true) -- ✅ เปิดแสง  
+exe.Text = "⏹ Stop"  
+exe.BackgroundColor3 = Color3.fromRGB(255,100,100)
+
+end)
+
+
+---
+
+-- 🔑 Simple Key UI
+
+if not hasValidKey() then
+local keyGui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
+keyGui.Name = "KeySystem"
+keyGui.ResetOnSpawn = false
+local frame = Instance.new("Frame", keyGui)
+frame.Size = UDim2.new(0,280,0,150)
+frame.Position = UDim2.new(0.5,-140,0.5,-75)
+frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0,8)
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0,30)
+title.Text = "Enter Key"
+textBox.Text = ""
+title.Font = Enum.Font.GothamBold
+title.TextColor3 = Color3.fromRGB(0,180,255)
+title.BackgroundTransparency = 1
+local box = Instance.new("TextBox", frame)
+box.Size = UDim2.new(1,-30,0,36)
+box.Position = UDim2.new(0,15,0,40)
+box.PlaceholderText = "Enter your key here..."
+box.Font = Enum.Font.Gotham
+box.TextColor3 = Color3.fromRGB(255,255,255)
+box.BackgroundColor3 = Color3.fromRGB(40,40,40)
+Instance.new("UICorner", box).CornerRadius = UDim.new(0,6)
+local btn = Instance.new("TextButton", frame)
+btn.Size = UDim2.new(1,-30,0,36)
+btn.Position = UDim2.new(0,15,0,90)
+btn.Text = "Confirm"
+btn.Font = Enum.Font.GothamBold
+btn.TextColor3 = Color3.fromRGB(255,255,255)
+btn.BackgroundColor3 = Color3.fromRGB(0,140,255)
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
+btn.MouseButton1Click:Connect(function()
+if box.Text == keyCode then
+saveKey()
+keyGui:Destroy()
+SG.Enabled = true
+else
+btn.Text, btn.BackgroundColor3 = "Invalid Key!", Color3.fromRGB(255,70,70)
+task.wait(1)
+btn.Text, btn.BackgroundColor3 = "Confirm", Color3.fromRGB(0,140,255)
+end
+end)
+else
+SG.Enabled = true
+end
+
+print("✅ DXD WarpControl (Classic Key Edition) Ready.")
