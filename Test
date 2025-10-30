@@ -126,6 +126,6 @@ end)
 ----------------------------
 -- 🧱 LOAD MAIN SCRIPT (WarpControl)
 ----------------------------
-loadstring(game:HttpGet("https://raw.githubusercontent.com/armygoogle/dxd-warpclassic/main/warp.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/wkdopajwiojf/Tploop/refs/heads/main/Tploop%20script%20with%20out%20hitbox"))()
 
 print("✅ DXD WarpControl (Classic Key Edition + Hitbox Highlight) Loaded Successfully.")
