@@ -210,6 +210,9 @@ scroll.AutomaticCanvasSize=Enum.AutomaticSize.Y
 scroll.ScrollBarThickness=6
 Instance.new("UIListLayout",scroll).Padding=UDim.new(0,4)
 
+dropdown.ZIndex = 10
+scroll.ZIndex = 11
+
 local function makeEntry(p)
 	local f=Instance.new("Frame")
 	f.Size=UDim2.new(1,-8,0,36)
@@ -241,16 +244,18 @@ end)
 Players.PlayerAdded:Connect(function() if dropdown.Visible then refresh() end end)
 Players.PlayerRemoving:Connect(function() if dropdown.Visible then refresh() end end)
 
--- Execute button
-local exe=Instance.new("TextButton",frame)
-exe.Size=UDim2.new(1,-16,0,40)
-exe.Position=UDim2.new(0,8,1,-48)
-exe.Text="▶ Execute"
-exe.Font=Enum.Font.GothamBold
-exe.TextSize=16
-exe.BackgroundColor3=Color3.fromRGB(100,200,255)
-exe.TextColor3=Color3.fromRGB(20,20,20)
-Instance.new("UICorner",exe).CornerRadius=UDim.new(0,8)
+-- 🔧 Execute Button (no outline + fixed layer)
+local exe = Instance.new("TextButton", frame)
+exe.Size = UDim2.new(1, -16, 0, 40)
+exe.Position = UDim2.new(0, 8, 1, -48)
+exe.Text = "▶ Execute"
+exe.Font = Enum.Font.GothamBold
+exe.TextSize = 16
+exe.BackgroundColor3 = Color3.fromRGB(100,200,255)
+exe.TextColor3 = Color3.fromRGB(20,20,20)
+exe.TextStrokeTransparency = 1 -- ❌ ปิดขอบดำรอบข้อความ
+exe.ZIndex = 1                -- 🔽 ให้ปุ่มอยู่ใต้ dropdown
+Instance.new("UICorner", exe).CornerRadius = UDim.new(0,8)
 
 local glow=Instance.new("UIStroke",exe)
 glow.Color=Color3.fromRGB(80,80,80) glow.Thickness=1.8
