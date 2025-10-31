@@ -238,7 +238,7 @@ T.BackgroundTransparency = 1
 T.Font = Enum.Font.GothamBold
 T.TextSize = 18
 T.TextColor3 = Color3.fromRGB(255,150,80)
-T.Text = "WarpControl (DXD)"
+T.Text = "Use this shit at your own risk."
 
 local inputFrame = Instance.new("Frame", F)
 inputFrame.Size = UDim2.new(1,-16,0,36)
