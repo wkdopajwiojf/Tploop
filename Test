@@ -1,7 +1,7 @@
 
 
 --// Config
-getgenv().whscript = "แมพ Unknow"        --Change to the name of your script
+getgenv().whscript = "Battel grounds map"        --Change to the name of your script
 getgenv().webhookexecUrl = "https://discord.com/api/webhooks/1412800788828258365/yk13Av7fcp8nLLZugFNWNJxY-Td2Bb3K11Jbazrc9JJVcXfmdsRR9i45Ii3s-uqawVo0"  --Put your Webhook Url here
 getgenv().ExecLogSecret = true                --decide to also log secret section
 
