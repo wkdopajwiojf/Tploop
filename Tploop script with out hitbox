@@ -10,8 +10,8 @@ DXD Warp UI ล่าสุดพร้อม Dropdown / Execute Glow / Error Co
 ]]
 
 -- ⚙️ Warp Distance Config
-local WARP_DISTANCE_MIN = 8   -- ระยะต่ำสุด (หน่วย stud)
-local WARP_DISTANCE_MAX = 8   -- ระยะสูงสุด (หน่วย stud)
+local WARP_DISTANCE_MIN = 6.5   -- ระยะต่ำสุด (หน่วย stud)
+local WARP_DISTANCE_MAX = 6.5   -- ระยะสูงสุด (หน่วย stud)
 
 ---
 
